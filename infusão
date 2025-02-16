@@ -1,0 +1,90 @@
+#include <WiFi.h>        // Biblioteca para conexão Wi-Fi
+#include <PubSubClient.h> // Biblioteca para MQTT
+
+// 🚀 Configurações do Wi-Fi
+const char* ssid = "SEU_WIFI";        // Nome da sua rede Wi-Fi
+const char* password = "SUA_SENHA";   // Senha do Wi-Fi
+
+// 🚀 Configurações do MQTT
+const char* mqtt_server = "broker.hivemq.com"; // Servidor MQTT gratuito
+const char* mqtt_topic = "infusao/status";     // Tópico MQTT onde enviaremos os dados
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// 🔌 Pinos da BitDogLab
+#define LED_AZUL 14   // LED para conexão Wi-Fi
+#define LED_VERDE 13  // LED para infusão normal
+#define LED_VERMELHO 12 // LED para erro na infusão
+#define BOTAO 2       // Botão para iniciar infusão
+
+// 🚀 Função para conectar ao Wi-Fi
+void conectarWiFi() {
+    Serial.print("Conectando ao Wi-Fi...");
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED) {
+        digitalWrite(LED_AZUL, HIGH);
+        delay(500);
+        Serial.print(".");
+    }
+    
+    digitalWrite(LED_AZUL, LOW);
+    Serial.println("\nWi-Fi Conectado!");
+}
+
+// 🚀 Função para conectar ao servidor MQTT
+void conectarMQTT() {
+    while (!client.connected()) {
+        Serial.print("Conectando ao MQTT...");
+        if (client.connect("bitdoglab_client")) {
+            Serial.println(" Conectado!");
+        } else {
+            Serial.print(" Falha. Código: ");
+            Serial.println(client.state());
+            delay(5000);
+        }
+    }
+}
+
+// 🚀 Simula a infusão e envia dados para o MQTT
+void iniciarInfusao() {
+    Serial.println("🟢 Infusão iniciada!");
+    digitalWrite(LED_VERDE, HIGH);
+    client.publish(mqtt_topic, "Infusão em andamento");
+    delay(5000); // Simula infusão por 5 segundos
+
+    // Simular erro aleatório
+    Serial.println("🔴 Erro na infusão!");
+    digitalWrite(LED_VERDE, LOW);
+    digitalWrite(LED_VERMELHO, HIGH);
+    client.publish(mqtt_topic, "ERRO: Obstrução detectada!");
+
+    delay(2000);  // Pausa antes de resetar erro
+    digitalWrite(LED_VERMELHO, LOW);
+}
+
+// 🚀 Configuração inicial da placa
+void setup() {
+    Serial.begin(115200); // Inicia a comunicação serial
+    conectarWiFi();
+    client.setServer(mqtt_server, 1883);
+
+    // Configura os pinos dos LEDs e botão
+    pinMode(LED_AZUL, OUTPUT);
+    pinMode(LED_VERDE, OUTPUT);
+    pinMode(LED_VERMELHO, OUTPUT);
+    pinMode(BOTAO, INPUT_PULLUP);
+}
+
+// 🚀 Loop principal
+void loop() {
+    if (!client.connected()) {
+        conectarMQTT();
+    }
+    client.loop();
+
+    if (digitalRead(BOTAO) == LOW) {  // Se o botão for pressionado
+        iniciarInfusao();
+        delay(2000);  // Evita leituras repetidas
+    }
+}
